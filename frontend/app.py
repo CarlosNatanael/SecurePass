@@ -139,7 +139,7 @@ def main(page: ft.Page):
                             state["dados_decifrados"] = descriptografar_tudo(blob)
                             mostrar_dashboard()
                         except:
-                            page.snack_bar = ft.SnackBar(ft.Text("Senha Mestra Incorreta (Não foi possível descriptografar)"))
+                            page.snack_bar = ft.SnackBar(ft.Text("Senha Mestra Incorreta (Decriptação falhou)"))
                             page.snack_bar.open = True
                             page.update()
                     else:
@@ -152,13 +152,15 @@ def main(page: ft.Page):
 
         page.add(
             ft.Column([
-                ft.Icon(ft.icons.SECURITY, size=100, color="blue"),
+                ft.Icon(ft.icons.SHIELD, size=100, color="blue"),
                 ft.Text("SecurePass Cloud", size=30, weight="bold"),
                 txt_user,
                 txt_pass,
                 ft.ElevatedButton("Entrar / Criar", on_click=tentar_login)
             ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True)
         )
+
     tela_login()
-    
-ft.app(target=main)
+
+if __name__ == "__main__":
+    ft.app(target=main)

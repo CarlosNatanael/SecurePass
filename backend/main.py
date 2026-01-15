@@ -7,8 +7,8 @@ app = FastAPI()
 
 DB_FILE = "db_usuarios.json"
 
-class DadosUsuarios(BaseModel):
-    username = str
+class DadosUsuario(BaseModel):
+    username: str
     blob_criptografado: str
 
 def carregar_db():
@@ -33,7 +33,7 @@ def obter_dados(username: str):
     return {"blob": ""}
 
 @app.get("/Salvar")
-def salvar_dados(dados: DadosUsuarios):
+def salvar_dados(dados: DadosUsuario):
     db = carregar_db()
     db[dados.username] = dados.blob_criptografado
     salvar_dados(db)
