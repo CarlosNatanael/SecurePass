@@ -1,12 +1,12 @@
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import hashes
-from cryptography.fernet import Fernet
 import flet as ft
 import requests
-import base64
 import json
-import os
+import base64
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+# Se estiver rodando local, mantenha localhost.
 SERVER_URL = "http://127.0.0.1:8000"
 
 def main(page: ft.Page):
@@ -14,6 +14,8 @@ def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.DARK
     page.window_width = 400
     page.window_height = 700
+    
+    # Variáveis de Estado
     state = {
         "usuario": "",
         "senha_mestra": "",
@@ -41,7 +43,7 @@ def main(page: ft.Page):
         try:
             dados_json = state["chave_fernet"].decrypt(token_criptografado.encode()).decode()
             return json.loads(dados_json)
-        except Exception as e:
+        except Exception:
             return []
 
     # --- COMUNICAÇÃO COM API ---
@@ -62,7 +64,10 @@ def main(page: ft.Page):
     # --- INTERFACE ---
     def mostrar_dashboard():
         page.clean()
+        
+        # Lista visual de senhas
         lista_senhas = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
+
         def renderizar_lista():
             lista_senhas.controls.clear()
             for item in state["dados_decifrados"]:
@@ -71,13 +76,14 @@ def main(page: ft.Page):
                         content=ft.Container(
                             padding=10,
                             content=ft.Row([
-                                ft.Icon(ft.icons.LOCK, color="blue"),
+                                # CORREÇÃO: Passando string direta, sem 'name='
+                                ft.Icon("lock", color="blue"),
                                 ft.Column([
                                     ft.Text(item['servico'], weight="bold"),
                                     ft.Text(item['usuario'], size=12, color="grey"),
                                 ], expand=True),
                                 ft.IconButton(
-                                    icon=ft.icons.COPY,
+                                    icon="copy", 
                                     tooltip="Copiar Senha",
                                     on_click=lambda _, s=item['senha']: page.set_clipboard(s)
                                 )
@@ -86,6 +92,8 @@ def main(page: ft.Page):
                     )
                 )
             page.update()
+
+        # Botão Adicionar Senha
         txt_servico = ft.TextField(label="Serviço")
         txt_login = ft.TextField(label="Login/Email")
         txt_senha_nova = ft.TextField(label="Senha", password=True, can_reveal_password=True)
@@ -104,15 +112,17 @@ def main(page: ft.Page):
                 sincronizar_dados()
                 dlg_add.open = False
                 page.update()
+
         dlg_add = ft.AlertDialog(
             title=ft.Text("Nova Senha"),
             content=ft.Column([txt_servico, txt_login, txt_senha_nova], height=200),
             actions=[ft.TextButton("Salvar", on_click=adicionar_senha)]
         )
+
         page.add(
             ft.AppBar(title=ft.Text(f"Cofre de {state['usuario']}"), actions=[
-                ft.IconButton(ft.icons.SYNC, on_click=sincronizar_dados),
-                ft.IconButton(ft.icons.ADD, on_click=lambda _: page.open(dlg_add))
+                ft.IconButton(icon="sync", on_click=sincronizar_dados),
+                ft.IconButton(icon="add", on_click=lambda _: page.open(dlg_add))
             ]),
             lista_senhas
         )
@@ -126,20 +136,23 @@ def main(page: ft.Page):
         def tentar_login(e):
             if not txt_user.value or not txt_pass.value:
                 return
+            
             state["usuario"] = txt_user.value
             state["senha_mestra"] = txt_pass.value
             state["chave_fernet"] = derivar_chave(txt_pass.value)
+            
             try:
                 res = requests.get(f"{SERVER_URL}/obter/{txt_user.value}")
                 if res.status_code == 200:
                     dados = res.json()
                     blob = dados.get("blob", "")
+                    
                     if blob:
                         try:
                             state["dados_decifrados"] = descriptografar_tudo(blob)
                             mostrar_dashboard()
                         except:
-                            page.snack_bar = ft.SnackBar(ft.Text("Senha Mestra Incorreta (Decriptação falhou)"))
+                            page.snack_bar = ft.SnackBar(ft.Text("Senha Mestra Incorreta!"))
                             page.snack_bar.open = True
                             page.update()
                     else:
@@ -152,7 +165,8 @@ def main(page: ft.Page):
 
         page.add(
             ft.Column([
-                ft.Icon(ft.icons.SHIELD, size=100, color="blue"),
+                # CORREÇÃO: Passando string direta "security"
+                ft.Icon("security", size=100, color="blue"),
                 ft.Text("SecurePass Cloud", size=30, weight="bold"),
                 txt_user,
                 txt_pass,
@@ -163,4 +177,5 @@ def main(page: ft.Page):
     tela_login()
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    # Tenta rodar da maneira mais simples possível para evitar erros de deprecation
+    ft.app(main)
