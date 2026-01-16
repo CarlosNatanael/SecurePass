@@ -1,181 +1,225 @@
-import flet as ft
+import tkinter as tk
+from tkinter import ttk, messagebox
 import requests
 import json
 import base64
+import random
+import string
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-# Se estiver rodando local, mantenha localhost.
+# --- CONFIGURAÇÃO DA NUVEM ---
 SERVER_URL = "http://127.0.0.1:8000"
 
-def main(page: ft.Page):
-    page.title = "SecurePass Cloud"
-    page.theme_mode = ft.ThemeMode.DARK
-    page.window_width = 400
-    page.window_height = 700
+# --- VARIÁVEIS GLOBAIS ---
+sessao_atual = {
+    "usuario": None,
+    "chave": None,
+    "dados": []
+}
+
+# ============ Configurações de Tema ============
+tema_atual = {
+    "bg": "#2b2b2b", "fg": "#e0e0e0", "entry_bg": "#424242", "entry_fg": "#ffffff",
+    "btn_bg": "#2b83a1", "btn_fg": "#ffffff", "btn_hover": "#0b495e",
+    "frame_bg": "#424242", "highlight": "#0D47A1"
+}
+
+# ============ Funções de Criptografia & Nuvem ============
+def derivar_chave(senha):
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(), length=32, salt=b'salt_fixo_por_enquanto', iterations=100000,
+    )
+    return Fernet(base64.urlsafe_b64encode(kdf.derive(senha.encode())))
+
+def sincronizar_upload():
+    if not sessao_atual["usuario"] or not sessao_atual["chave"]:
+        return
+
+    try:
+        dados_json = json.dumps(sessao_atual["dados"])
+        blob_criptografado = sessao_atual["chave"].encrypt(dados_json.encode()).decode()
+        payload = {"username": sessao_atual["usuario"], "blob_criptografado": blob_criptografado}
+        
+        res = requests.post(f"{SERVER_URL}/salvar", json=payload)
+        if res.status_code == 200:
+            print("Sincronizado com sucesso!")
+        else:
+            messagebox.showerror("Erro Cloud", "Falha ao salvar na nuvem.")
+    except Exception as e:
+        messagebox.showerror("Erro de Conexão", f"Servidor offline: {e}")
+
+def carregar_da_nuvem(usuario, senha_mestra):
+    try:
+        res = requests.get(f"{SERVER_URL}/obter/{usuario}")
+        if res.status_code == 200:
+            resposta = res.json()
+            blob = resposta.get("blob", "")
+            chave_temp = derivar_chave(senha_mestra)
+            
+            if blob:
+                try:
+                    json_decifrado = chave_temp.decrypt(blob.encode()).decode()
+                    dados = json.loads(json_decifrado)
+                    return True, chave_temp, dados
+                except:
+                    return False, None, [] 
+            else:
+                return True, chave_temp, [] 
+        return False, None, []
+    except Exception as e:
+        messagebox.showerror("Erro", f"Erro de conexão: {e}")
+        return False, None, []
+
+# ============ Funções do Gerador de Senhas ============
+def gerar_senha_segura(tamanho=16):
+    caracteres = string.ascii_letters + string.digits + string.punctuation
+    senha = ''.join(random.choice(caracteres) for _ in range(tamanho))
+    return senha
+
+def inserir_senha_gerada():
+    nova_senha = gerar_senha_segura()
+    campo_senha.delete(0, tk.END)
+    campo_senha.insert(0, nova_senha)
+
+# ============ Funções da Interface ============
+def acao_login():
+    user = ent_login_user.get()
+    senha = ent_login_pass.get()
     
-    # Variáveis de Estado
-    state = {
-        "usuario": "",
-        "senha_mestra": "",
-        "chave_fernet": None,
-        "dados_decifrados": []
-    }
-
-    # --- FUNÇÕES DE SEGURANÇA ---
-    def derivar_chave(senha: str, salt: bytes = b'salt_fixo_por_enquanto'):
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=salt,
-            iterations=100000,
-        )
-        key = base64.urlsafe_b64encode(kdf.derive(senha.encode()))
-        return Fernet(key)
-
-    def criptografar_tudo():
-        dados_json = json.dumps(state["dados_decifrados"])
-        token = state["chave_fernet"].encrypt(dados_json.encode())
-        return token.decode()
-
-    def descriptografar_tudo(token_criptografado):
-        try:
-            dados_json = state["chave_fernet"].decrypt(token_criptografado.encode()).decode()
-            return json.loads(dados_json)
-        except Exception:
-            return []
-
-    # --- COMUNICAÇÃO COM API ---
-    def sincronizar_dados(e=None):
-        try:
-            blob = criptografar_tudo()
-            payload = {"username": state["usuario"], "blob_criptografado": blob}
-            res = requests.post(f"{SERVER_URL}/salvar", json=payload)
-            if res.status_code == 200:
-                page.snack_bar = ft.SnackBar(ft.Text("Dados salvos na nuvem!"))
-                page.snack_bar.open = True
-                page.update()
-        except Exception as erro:
-            page.snack_bar = ft.SnackBar(ft.Text(f"Erro de conexão: {erro}"))
-            page.snack_bar.open = True
-            page.update()
-
-    # --- INTERFACE ---
-    def mostrar_dashboard():
-        page.clean()
+    if not user or not senha:
+        messagebox.showwarning("Aviso", "Preencha usuário e senha!")
+        return
         
-        # Lista visual de senhas
-        lista_senhas = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
+    sucesso, chave, dados = carregar_da_nuvem(user, senha)
+    
+    if sucesso:
+        sessao_atual["usuario"] = user
+        sessao_atual["chave"] = chave
+        sessao_atual["dados"] = dados
+        janela_login.destroy()
+        abrir_janela_principal()
+    else:
+        messagebox.showerror("Login Falhou", "Senha incorreta ou erro de conexão.")
 
-        def renderizar_lista():
-            lista_senhas.controls.clear()
-            for item in state["dados_decifrados"]:
-                lista_senhas.controls.append(
-                    ft.Card(
-                        content=ft.Container(
-                            padding=10,
-                            content=ft.Row([
-                                # CORREÇÃO: Passando string direta, sem 'name='
-                                ft.Icon("lock", color="blue"),
-                                ft.Column([
-                                    ft.Text(item['servico'], weight="bold"),
-                                    ft.Text(item['usuario'], size=12, color="grey"),
-                                ], expand=True),
-                                ft.IconButton(
-                                    icon="copy", 
-                                    tooltip="Copiar Senha",
-                                    on_click=lambda _, s=item['senha']: page.set_clipboard(s)
-                                )
-                            ])
-                        )
-                    )
-                )
-            page.update()
+def salvar_senha_nova():
+    servico = entrada_servico.get()
+    usuario = entrada_usuario.get()
+    senha = campo_senha.get()
+    
+    if not servico or not usuario or not senha:
+        messagebox.showwarning("Campos Vazios", "Preencha todos os campos!")
+        return
+    
+    sessao_atual["dados"].append({"servico": servico, "usuario": usuario, "senha": senha})
+    
+    entrada_servico.delete(0, tk.END)
+    entrada_usuario.delete(0, tk.END)
+    campo_senha.delete(0, tk.END)
+    
+    sincronizar_upload()
+    messagebox.showinfo("Sucesso", "Senha salva e sincronizada!")
+    atualizar_lista()
 
-        # Botão Adicionar Senha
-        txt_servico = ft.TextField(label="Serviço")
-        txt_login = ft.TextField(label="Login/Email")
-        txt_senha_nova = ft.TextField(label="Senha", password=True, can_reveal_password=True)
+def atualizar_lista():
+    for item in tree.get_children():
+        tree.delete(item)
+    filtro = entrada_busca.get().lower()
+    for item in sessao_atual["dados"]:
+        if filtro in item["servico"].lower():
+            tree.insert("", "end", values=(item["servico"], item["usuario"], "••••••••"))
 
-        def adicionar_senha(e):
-            if txt_servico.value and txt_senha_nova.value:
-                state["dados_decifrados"].append({
-                    "servico": txt_servico.value,
-                    "usuario": txt_login.value,
-                    "senha": txt_senha_nova.value
-                })
-                txt_servico.value = ""
-                txt_login.value = ""
-                txt_senha_nova.value = ""
-                renderizar_lista()
-                sincronizar_dados()
-                dlg_add.open = False
-                page.update()
-
-        dlg_add = ft.AlertDialog(
-            title=ft.Text("Nova Senha"),
-            content=ft.Column([txt_servico, txt_login, txt_senha_nova], height=200),
-            actions=[ft.TextButton("Salvar", on_click=adicionar_senha)]
-        )
-
-        page.add(
-            ft.AppBar(title=ft.Text(f"Cofre de {state['usuario']}"), actions=[
-                ft.IconButton(icon="sync", on_click=sincronizar_dados),
-                ft.IconButton(icon="add", on_click=lambda _: page.open(dlg_add))
-            ]),
-            lista_senhas
-        )
-        renderizar_lista()
-
-    # Tela de Login
-    def tela_login():
-        txt_user = ft.TextField(label="Usuário", width=300)
-        txt_pass = ft.TextField(label="Senha Mestra", password=True, width=300)
+def copiar_senha_selecionada():
+    selecionado = tree.focus()
+    if selecionado:
+        item_tree = tree.item(selecionado)['values']
+        servico, usuario = item_tree[0], item_tree[1]
         
-        def tentar_login(e):
-            if not txt_user.value or not txt_pass.value:
+        for dado in sessao_atual["dados"]:
+            if dado["servico"] == servico and dado["usuario"] == usuario:
+                janela_principal.clipboard_clear()
+                janela_principal.clipboard_append(dado["senha"])
+                messagebox.showinfo("Copiado", "Senha copiada para área de transferência!")
                 return
-            
-            state["usuario"] = txt_user.value
-            state["senha_mestra"] = txt_pass.value
-            state["chave_fernet"] = derivar_chave(txt_pass.value)
-            
-            try:
-                res = requests.get(f"{SERVER_URL}/obter/{txt_user.value}")
-                if res.status_code == 200:
-                    dados = res.json()
-                    blob = dados.get("blob", "")
-                    
-                    if blob:
-                        try:
-                            state["dados_decifrados"] = descriptografar_tudo(blob)
-                            mostrar_dashboard()
-                        except:
-                            page.snack_bar = ft.SnackBar(ft.Text("Senha Mestra Incorreta!"))
-                            page.snack_bar.open = True
-                            page.update()
-                    else:
-                        state["dados_decifrados"] = []
-                        mostrar_dashboard()
-            except Exception as erro:
-                page.snack_bar = ft.SnackBar(ft.Text(f"Erro ao conectar no servidor: {erro}"))
-                page.snack_bar.open = True
-                page.update()
 
-        page.add(
-            ft.Column([
-                # CORREÇÃO: Passando string direta "security"
-                ft.Icon("security", size=100, color="blue"),
-                ft.Text("SecurePass Cloud", size=30, weight="bold"),
-                txt_user,
-                txt_pass,
-                ft.ElevatedButton("Entrar / Criar", on_click=tentar_login)
-            ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True)
-        )
+# ============ Janela Principal ============
+def abrir_janela_principal():
+    global janela_principal, entrada_servico, entrada_usuario, campo_senha, tree, entrada_busca
+    
+    janela_principal = tk.Tk()
+    janela_principal.title(f"SecurePass Cloud - {sessao_atual['usuario']}")
+    janela_principal.geometry("650x500")
+    janela_principal.config(bg=tema_atual["bg"])
+    
+    # --- Área de Cadastro ---
+    frame_form = tk.Frame(janela_principal, bg=tema_atual["bg"], pady=10)
+    frame_form.pack(fill="x", padx=10)
+    
+    # Grid Layout para o formulário
+    tk.Label(frame_form, text="Serviço:", bg=tema_atual["bg"], fg=tema_atual["fg"]).grid(row=0, column=0, sticky="w")
+    entrada_servico = tk.Entry(frame_form, width=20, bg=tema_atual["entry_bg"], fg=tema_atual["entry_fg"])
+    entrada_servico.grid(row=0, column=1, padx=5)
+    
+    tk.Label(frame_form, text="User:", bg=tema_atual["bg"], fg=tema_atual["fg"]).grid(row=0, column=2, sticky="w")
+    entrada_usuario = tk.Entry(frame_form, width=20, bg=tema_atual["entry_bg"], fg=tema_atual["entry_fg"])
+    entrada_usuario.grid(row=0, column=3, padx=5)
+    
+    tk.Label(frame_form, text="Senha:", bg=tema_atual["bg"], fg=tema_atual["fg"]).grid(row=1, column=0, sticky="w", pady=10)
+    campo_senha = tk.Entry(frame_form, width=20, bg=tema_atual["entry_bg"], fg=tema_atual["entry_fg"])
+    campo_senha.grid(row=1, column=1, padx=5, pady=10)
+    
+    # Botão GERAR (O retorno do rei)
+    btn_gerar = tk.Button(frame_form, text="🎲 Gerar", command=inserir_senha_gerada, 
+                         bg="#FF9800", fg="white", font=("Arial", 8, "bold"), width=10)
+    btn_gerar.grid(row=1, column=2, sticky="w", padx=5)
+    
+    # Botão SALVAR
+    btn_salvar = tk.Button(frame_form, text="Salvar na Nuvem", command=salvar_senha_nova, 
+                          bg=tema_atual["btn_bg"], fg="white", width=20)
+    btn_salvar.grid(row=2, column=0, columnspan=4, pady=10)
 
-    tela_login()
+    # --- Área de Lista ---
+    frame_lista = tk.Frame(janela_principal, bg=tema_atual["bg"])
+    frame_lista.pack(fill="both", expand=True, padx=10, pady=10)
+    
+    tk.Label(frame_lista, text="Buscar:", bg=tema_atual["bg"], fg=tema_atual["fg"]).pack(anchor="w")
+    entrada_busca = tk.Entry(frame_lista, bg=tema_atual["entry_bg"], fg=tema_atual["entry_fg"])
+    entrada_busca.pack(fill="x", pady=(0, 5))
+    entrada_busca.bind("<KeyRelease>", lambda e: atualizar_lista())
+    
+    colunas = ("Serviço", "Usuário", "Senha")
+    tree = ttk.Treeview(frame_lista, columns=colunas, show="headings")
+    for col in colunas:
+        tree.heading(col, text=col)
+        tree.column(col, width=150)
+    tree.pack(fill="both", expand=True)
+    
+    btn_copiar = tk.Button(frame_lista, text="Copiar Senha Selecionada", command=copiar_senha_selecionada, 
+                          bg="#4CAF50", fg="white", pady=5)
+    btn_copiar.pack(fill="x", pady=5)
+    
+    atualizar_lista()
+    janela_principal.mainloop()
 
-if __name__ == "__main__":
-    # Tenta rodar da maneira mais simples possível para evitar erros de deprecation
-    ft.app(main)
+# ============ TELA DE LOGIN ============
+janela_login = tk.Tk()
+janela_login.title("Login SecurePass Cloud")
+janela_login.geometry("300x250")
+janela_login.config(bg=tema_atual["bg"])
+
+tk.Label(janela_login, text="SecurePass Cloud", font=("Arial", 14, "bold"), 
+         bg=tema_atual["bg"], fg=tema_atual["fg"]).pack(pady=20)
+
+tk.Label(janela_login, text="Usuário:", bg=tema_atual["bg"], fg=tema_atual["fg"]).pack()
+ent_login_user = tk.Entry(janela_login)
+ent_login_user.pack(pady=5)
+
+tk.Label(janela_login, text="Senha Mestra:", bg=tema_atual["bg"], fg=tema_atual["fg"]).pack()
+ent_login_pass = tk.Entry(janela_login, show="*")
+ent_login_pass.pack(pady=5)
+
+tk.Button(janela_login, text="ENTRAR", command=acao_login, 
+          bg=tema_atual["btn_bg"], fg="white", width=15, height=2).pack(pady=20)
+
+janela_login.mainloop()

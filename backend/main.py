@@ -14,7 +14,7 @@ class DadosUsuario(BaseModel):
 def carregar_db():
     if not os.path.exists(DB_FILE):
         return {}
-    with open (DB_FILE, "r") as f:
+    with open(DB_FILE, "r") as f:
         return json.load(f)
 
 def salvar_db(db):
@@ -32,9 +32,9 @@ def obter_dados(username: str):
         return {"blob": db[username]}
     return {"blob": ""}
 
-@app.get("/Salvar")
+@app.post("/salvar")
 def salvar_dados(dados: DadosUsuario):
     db = carregar_db()
     db[dados.username] = dados.blob_criptografado
-    salvar_dados(db)
+    salvar_db(db)
     return {"status": "Sucesso", "mensagem": "Dados sincronizados na nuvem"}
