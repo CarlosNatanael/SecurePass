@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
-// --- A CORREÇÃO ESTÁ AQUI NA LINHA ABAIXO ---
 import 'react-native-get-random-values'; 
-// --------------------------------------------
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, Alert, SafeAreaView, StatusBar, ActivityIndicator, Modal } from 'react-native';
 import axios from 'axios';
 import CryptoJS from 'crypto-js';
+import * as Clipboard from 'expo-clipboard';
 
 // --- CONFIGURAÇÃO ---
-// USE O IP DO SEU PC (Confira no comando 'ipconfig')
-const API_URL = "http://192.168.1.244:8000"; 
+const API_URL = "http://192.168.0.109:8000";
 const ITERATIONS = 5000; 
 
 export default function App() {
@@ -18,12 +16,28 @@ export default function App() {
   const [dados, setDados] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Estados para o Modal de Adicionar/Editar
+  // Estados do Modal
   const [modalVisible, setModalVisible] = useState(false);
   const [editandoIndex, setEditandoIndex] = useState(null); 
   const [formServico, setFormServico] = useState('');
   const [formUsuario, setFormUsuario] = useState('');
   const [formSenha, setFormSenha] = useState('');
+
+  // --- FUNÇÕES ÚTEIS ---
+  
+  const gerarSenhaAleatoria = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+";
+    let password = "";
+    for (let i = 0; i < 16; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setFormSenha(password);
+  };
+
+  const copiarParaClipboard = async (senha) => {
+    await Clipboard.setStringAsync(senha);
+    Alert.alert("Sucesso", "Senha copiada para a área de transferência!");
+  };
 
   // --- CRIPTOGRAFIA ---
   const derivarChave = (senha) => {
@@ -53,7 +67,6 @@ export default function App() {
   };
 
   const criptografarFernet = (dadosJson, keyWordArray) => {
-    // AQUI OCORRIA O ERRO: Ele tentava gerar random(16) e falhava sem a importação nova
     const keyHex = CryptoJS.enc.Hex.stringify(keyWordArray);
     const signingKey = CryptoJS.enc.Hex.parse(keyHex.substring(0, 32));
     const encryptionKey = CryptoJS.enc.Hex.parse(keyHex.substring(32));
@@ -80,8 +93,7 @@ export default function App() {
     try {
       const dadosJson = JSON.stringify(novaLista);
       const chave = derivarChave(senhaMestra);
-      // Agora essa função vai funcionar graças ao 'react-native-get-random-values'
-      const blob = criptografarFernet(dadosJson, chave); 
+      const blob = criptografarFernet(dadosJson, chave);
 
       await axios.post(`${API_URL}/salvar`, {
         username: usuario,
@@ -124,7 +136,7 @@ export default function App() {
     }, 100);
   };
 
-  // --- LÓGICA CRUD ---
+  // --- INTERFACE ---
   const abrirModalAdicionar = () => {
     setEditandoIndex(null);
     setFormServico(''); setFormUsuario(''); setFormSenha('');
@@ -156,7 +168,6 @@ export default function App() {
     ]);
   };
 
-  // --- INTERFACE ---
   if (tela === 'login') {
     return (
       <SafeAreaView style={styles.loginContainer}>
@@ -205,8 +216,8 @@ export default function App() {
                 <Text style={styles.itemUser}>{item.usuario}</Text>
               </View>
               <View style={styles.actions}>
-                <TouchableOpacity onPress={() => Alert.alert("Senha", item.senha)} style={styles.actionBtn}>
-                  <Text style={styles.actionIcon}>👁️</Text>
+                <TouchableOpacity onPress={() => copiarParaClipboard(item.senha)} style={styles.actionBtn}>
+                  <Text style={styles.actionIcon}>📋</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => abrirModalEditar(item, index)} style={styles.actionBtn}>
                   <Text style={styles.actionIcon}>✏️</Text>
@@ -220,14 +231,26 @@ export default function App() {
         />
       )}
 
-      {/* MODAL */}
       <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>{editandoIndex !== null ? "Editar Senha" : "Nova Senha"}</Text>
+            
             <TextInput style={styles.input} placeholder="Serviço" placeholderTextColor="#64748b" value={formServico} onChangeText={setFormServico} />
             <TextInput style={styles.input} placeholder="Usuário" placeholderTextColor="#64748b" value={formUsuario} onChangeText={setFormUsuario} />
-            <TextInput style={styles.input} placeholder="Senha" placeholderTextColor="#64748b" value={formSenha} onChangeText={setFormSenha} />
+
+            <View style={styles.row}>
+                <TextInput 
+                    style={[styles.input, {flex: 1}]} 
+                    placeholder="Senha" 
+                    placeholderTextColor="#64748b" 
+                    value={formSenha} 
+                    onChangeText={setFormSenha} 
+                />
+                <TouchableOpacity style={styles.btnGenerate} onPress={gerarSenhaAleatoria}>
+                    <Text style={{fontSize: 20}}>🎲</Text>
+                </TouchableOpacity>
+            </View>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity style={[styles.btnModal, styles.btnCancel]} onPress={() => setModalVisible(false)}>
@@ -256,15 +279,18 @@ const styles = StyleSheet.create({
   btnLogin: { backgroundColor: '#2563eb', padding: 15, borderRadius: 8, alignItems: 'center', width: '100%' }, 
   btnModal: { padding: 15, borderRadius: 8, alignItems: 'center', flex: 1 }, 
   
+  // Estilo do Botão Gerar Senha
+  row: { flexDirection: 'row', gap: 10 },
+  btnGenerate: { backgroundColor: '#f59e0b', padding: 12, borderRadius: 8, height: 50, justifyContent: 'center', alignItems: 'center', width: 50 },
+
   btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, backgroundColor: '#1e293b' },
   titleSmall: { fontSize: 18, fontWeight: 'bold', color: '#f8fafc' },
   btnSmall: { backgroundColor: '#ef4444', padding: 8, borderRadius: 6 },
   btnTextSmall: { color: '#fff', fontWeight: 'bold' },
   btnSmallAdd: { backgroundColor: '#10b981', padding: 8, borderRadius: 6, width: 40, alignItems: 'center' },
   btnTextAdd: { color: '#fff', fontWeight: 'bold', fontSize: 18, lineHeight: 20 },
-
+  
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyText: { color: '#64748b', fontSize: 18 },
   emptySubText: { color: '#475569' },
@@ -275,7 +301,6 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row' },
   actionBtn: { padding: 8, marginLeft: 5 },
   actionIcon: { fontSize: 20 },
-
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
   modalCard: { backgroundColor: '#1e293b', padding: 20, borderRadius: 15 },
   modalTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 20, textAlign: 'center' },
