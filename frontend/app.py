@@ -61,7 +61,7 @@ TEMA_MODERNO = {
 # ============ Funções de Criptografia & Nuvem ============
 def derivar_chave(senha):
     kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(), length=32, salt=b'salt_fixo_por_enquanto', iterations=100000,
+        algorithm=hashes.SHA256(), length=32, salt=b'salt_fixo_por_enquanto', iterations=5000,
     )
     return Fernet(base64.urlsafe_b64encode(kdf.derive(senha.encode())))
 

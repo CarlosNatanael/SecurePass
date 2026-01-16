@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, Alert, SafeAreaView, StatusBar } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, Alert, SafeAreaView, StatusBar, ActivityIndicator } from 'react-native';
 import axios from 'axios';
 import CryptoJS from 'crypto-js';
 
 // --- CONFIGURAÇÃO ---
 const API_URL = "http://192.168.1.244:8000"; 
+// MUDANÇA DE PERFORMANCE: De 100.000 para 5.000
+const ITERATIONS = 5000; 
 
 export default function App() {
   const [tela, setTela] = useState('login'); 
@@ -18,7 +20,7 @@ export default function App() {
     const salt = CryptoJS.enc.Utf8.parse("salt_fixo_por_enquanto");
     const key = CryptoJS.PBKDF2(senha, salt, {
       keySize: 256 / 32,
-      iterations: 100000,
+      iterations: ITERATIONS, // Usando a constante mais rápida
       hasher: CryptoJS.algo.SHA256
     });
     return key;
@@ -51,38 +53,38 @@ export default function App() {
     if (!usuario || !senhaMestra) return Alert.alert("Erro", "Preencha tudo");
     
     setLoading(true);
-    try {
-      console.log(`Buscando usuário: ${usuario} em ${API_URL}`);
-      const response = await axios.get(`${API_URL}/obter/${usuario}`);
-      const blob = response.data.blob;
+    // Pequeno delay para permitir que o React renderize o Loading antes de travar o processamento
+    setTimeout(async () => {
+      try {
+        console.log(`Buscando usuário: ${usuario} em ${API_URL}`);
+        const response = await axios.get(`${API_URL}/obter/${usuario}`);
+        const blob = response.data.blob;
 
-      if (!blob) {
-        Alert.alert(
-          "Atenção", 
-          `O usuário '${usuario}' não tem dados no servidor.\n\nVerifique se:\n1. Você digitou o nome EXATO (maiúsculas importam).\n2. Você clicou em 'Salvar na Nuvem' no PC.`
-        );
-        setDados([]);
-      } else {
-        const chave = derivarChave(senhaMestra);
-        const jsonDecifrado = descriptografarFernet(blob, chave);
-
-        if (jsonDecifrado) {
-          const listaSenhas = JSON.parse(jsonDecifrado);
-          
-          if (listaSenhas.length === 0) {
-             Alert.alert("Cofre Vazio", "Conectei e abri o cofre, mas não tem nenhuma senha salva dentro dele.");
-          }
-          setDados(listaSenhas);
-          setTela('lista');
+        if (!blob) {
+          Alert.alert("Atenção", "Usuário não encontrado ou sem dados.");
+          setDados([]);
+          setLoading(false);
         } else {
-          Alert.alert("Senha Errada", "Encontrei o usuário, mas a Senha Mestra não abriu o cofre.");
+          const chave = derivarChave(senhaMestra);
+          const jsonDecifrado = descriptografarFernet(blob, chave);
+
+          if (jsonDecifrado) {
+            const listaSenhas = JSON.parse(jsonDecifrado);
+            if (listaSenhas.length === 0) {
+               Alert.alert("Cofre Vazio", "Não há senhas salvas.");
+            }
+            setDados(listaSenhas);
+            setTela('lista');
+          } else {
+            Alert.alert("Senha Errada", "Não foi possível abrir o cofre. Verifique se atualizou o PC para 5000 iterações também.");
+          }
+          setLoading(false);
         }
+      } catch (error) {
+        Alert.alert("Erro Conexão", error.message);
+        setLoading(false);
       }
-    } catch (error) {
-      Alert.alert("Erro Conexão", error.message);
-    } finally {
-      setLoading(false);
-    }
+    }, 100);
   };
 
   // --- INTERFACE ---
@@ -115,7 +117,11 @@ export default function App() {
           />
 
           <TouchableOpacity style={styles.btn} onPress={fazerLogin} disabled={loading}>
-            <Text style={styles.btnText}>{loading ? "Verificando..." : "Acessar Cofre"}</Text>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.btnText}>Acessar Cofre</Text>
+            )}
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -135,13 +141,13 @@ export default function App() {
       {dados.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Nenhuma senha encontrada.</Text>
-          <Text style={styles.emptySubText}>Adicione senhas pelo PC e clique em "Salvar na Nuvem".</Text>
         </View>
       ) : (
         <FlatList
           data={dados}
           keyExtractor={(item, index) => index.toString()}
-          contentContainerStyle={{ paddingBottom: 20 }}
+          // AQUI ESTÁ A CORREÇÃO VISUAL: Padding no topo e embaixo
+          contentContainerStyle={{ paddingTop: 20, paddingBottom: 100 }}
           renderItem={({item}) => (
             <View style={styles.item}>
               <View style={styles.itemIcon}>
@@ -164,13 +170,7 @@ export default function App() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f172a' },
-  
-  loginContainer: { 
-    flex: 1, 
-    backgroundColor: '#0f172a', 
-    justifyContent: 'center'
-  },
-
+  loginContainer: { flex: 1, backgroundColor: '#0f172a', justifyContent: 'center' },
   card: { backgroundColor: '#1e293b', margin: 20, padding: 25, borderRadius: 15 },
   logo: { fontSize: 50, textAlign: 'center', marginBottom: 10 },
   title: { fontSize: 24, fontWeight: 'bold', color: '#f8fafc', marginBottom: 30, textAlign: 'center' },
@@ -179,15 +179,14 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#334155', color: '#fff', padding: 15, borderRadius: 8, marginBottom: 20, fontSize: 16 },
   btn: { backgroundColor: '#2563eb', padding: 15, borderRadius: 8, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#1e293b' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#1e293b', zIndex: 10 },
   btnSair: { backgroundColor: '#ef4444', paddingVertical: 8, paddingHorizontal: 15, borderRadius: 6 },
   btnTextSmall: { color: '#fff', fontWeight: 'bold' },
-  item: { backgroundColor: '#1e293b', marginHorizontal: 20, marginTop: 15, padding: 15, borderRadius: 10, flexDirection: 'row', alignItems: 'center' },
+  item: { backgroundColor: '#1e293b', marginHorizontal: 20, marginBottom: 15, padding: 15, borderRadius: 10, flexDirection: 'row', alignItems: 'center' },
   itemIcon: { width: 40, height: 40, backgroundColor: '#334155', borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 15 },
   itemTitle: { color: '#f8fafc', fontWeight: 'bold', fontSize: 16 },
   itemUser: { color: '#94a3b8', fontSize: 14 },
   eyeIcon: { fontSize: 20, padding: 5 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyText: { color: '#64748b', fontSize: 18, fontWeight: 'bold' },
-  emptySubText: { color: '#475569', textAlign: 'center', marginTop: 10 }
 });
