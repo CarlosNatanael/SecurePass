@@ -4,9 +4,9 @@ import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, Alert, S
 import axios from 'axios';
 import CryptoJS from 'crypto-js';
 import * as Clipboard from 'expo-clipboard';
+import { API_URL } from './config';
 
 // --- CONFIGURAÇÃO ---
-const API_URL = "http://192.168.0.109:8000";
 const ITERATIONS = 5000; 
 
 export default function App() {

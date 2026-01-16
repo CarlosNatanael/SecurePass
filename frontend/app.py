@@ -8,9 +8,7 @@ import string
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-
-# --- CONFIGURAÇÃO DA NUVEM ---
-SERVER_URL = "http://127.0.0.1:8000"
+from frontend.config import API_URL
 
 # --- VARIÁVEIS GLOBAIS ---
 sessao_atual = {
@@ -74,7 +72,7 @@ def sincronizar_upload():
         blob_criptografado = sessao_atual["chave"].encrypt(dados_json.encode()).decode()
         payload = {"username": sessao_atual["usuario"], "blob_criptografado": blob_criptografado}
         
-        res = requests.post(f"{SERVER_URL}/salvar", json=payload)
+        res = requests.post(f"{API_URL}/salvar", json=payload)
         if res.status_code == 200:
             print("Sincronizado com sucesso!")
         else:
@@ -84,7 +82,7 @@ def sincronizar_upload():
 
 def carregar_da_nuvem(usuario, senha_mestra):
     try:
-        res = requests.get(f"{SERVER_URL}/obter/{usuario}")
+        res = requests.get(f"{API_URL}/obter/{usuario}")
         if res.status_code == 200:
             resposta = res.json()
             blob = resposta.get("blob", "")
