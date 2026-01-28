@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
 import json
 import os
@@ -18,7 +18,7 @@ def carregar_db():
     try:
         with open(DB_FILE, "r") as f:
             return json.load(f)
-    except json.JSONDecodeError:
+    except Exception:
         return {}
 
 def salvar_db(db):
@@ -27,7 +27,7 @@ def salvar_db(db):
 
 @app.get("/")
 def home():
-    return {"status": "SecurePass Server Online", "db_path": DB_FILE}
+    return {"status": "SecurePass Server Online", "db_local": DB_FILE}
 
 @app.get("/obter/{username}")
 def obter_dados(username: str):
@@ -42,7 +42,3 @@ def salvar_dados(dados: DadosUsuario):
     db[dados.username] = dados.blob_criptografado
     salvar_db(db)
     return {"status": "Sucesso", "mensagem": "Dados sincronizados na nuvem"}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
