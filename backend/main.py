@@ -1,16 +1,11 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+from flask import Flask, request, jsonify
 import json
 import os
 
-app = FastAPI()
+app = Flask(__name__)
 
 DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(DIRETORIO_ATUAL, "db_usuarios.json")
-
-class DadosUsuario(BaseModel):
-    username: str
-    blob_criptografado: str
 
 def carregar_db():
     if not os.path.exists(DB_FILE):
@@ -28,20 +23,31 @@ def salvar_db(db):
     except Exception as e:
         print(f"Erro ao salvar: {e}")
 
-@app.get("/")
+@app.route('/')
 def home():
-    return {"status": "SecurePass Server Online", "db_local": DB_FILE}
+    return jsonify({"status": "SecurePass (Flask) Online", "db_local": DB_FILE})
 
-@app.get("/obter/{username}")
-def obter_dados(username: str):
+@app.route('/obter/<username>', methods=['GET'])
+def obter_dados(username):
     db = carregar_db()
     if username in db:
-        return {"blob": db[username]}
-    return {"blob": ""}
+        return jsonify({"blob": db[username]})
+    return jsonify({"blob": ""})
 
-@app.post("/salvar")
-def salvar_dados(dados: DadosUsuario):
+@app.route('/salvar', methods=['POST'])
+def salvar_dados():
+    dados = request.get_json()
+    
+    if not dados:
+        return jsonify({"erro": "Sem dados"}), 400
+        
+    usuario = dados.get("username")
+    blob = dados.get("blob_criptografado")
+    
+    if not usuario or not blob:
+        return jsonify({"erro": "Dados incompletos"}), 400
+
     db = carregar_db()
-    db[dados.username] = dados.blob_criptografado
+    db[usuario] = blob
     salvar_db(db)
-    return {"status": "Sucesso", "mensagem": "Dados sincronizados na nuvem"}
+    return jsonify({"status": "Sucesso", "mensagem": "Dados sincronizados via Flask"})
