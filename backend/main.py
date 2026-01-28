@@ -15,8 +15,11 @@ class DadosUsuario(BaseModel):
 def carregar_db():
     if not os.path.exists(DB_FILE):
         return {}
-    with open(DB_FILE, "r") as f:
-        return json.load(f)
+    try:
+        with open(DB_FILE, "r") as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        return {}
 
 def salvar_db(db):
     with open(DB_FILE, "w") as f:
@@ -24,7 +27,7 @@ def salvar_db(db):
 
 @app.get("/")
 def home():
-    return {"status": "SecurePass Server Online"}
+    return {"status": "SecurePass Server Online", "db_path": DB_FILE}
 
 @app.get("/obter/{username}")
 def obter_dados(username: str):
@@ -39,3 +42,7 @@ def salvar_dados(dados: DadosUsuario):
     db[dados.username] = dados.blob_criptografado
     salvar_db(db)
     return {"status": "Sucesso", "mensagem": "Dados sincronizados na nuvem"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
