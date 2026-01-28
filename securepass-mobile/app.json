@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "securepass-mobile",
+    "name": "securepass",
     "slug": "securepass-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -20,10 +20,16 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.carlosnatanael.securepassmobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "19d8e7ab-7204-4da9-b3e1-2049f3dd6aa1"
+      }
     }
   }
 }
