@@ -22,8 +22,11 @@ def carregar_db():
         return {}
 
 def salvar_db(db):
-    with open(DB_FILE, "w") as f:
-        json.dump(db, f)
+    try:
+        with open(DB_FILE, "w") as f:
+            json.dump(db, f)
+    except Exception as e:
+        print(f"Erro ao salvar: {e}")
 
 @app.get("/")
 def home():
