@@ -5,7 +5,8 @@ import os
 
 app = FastAPI()
 
-DB_FILE = "db_usuarios.json"
+DIRETORIO_ATUAL = os.path.dirname(os.path.abspath(__file__))
+DB_FILE = os.path.join(DIRETORIO_ATUAL, "db_usuarios.json")
 
 class DadosUsuario(BaseModel):
     username: str
