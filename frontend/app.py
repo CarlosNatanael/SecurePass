@@ -86,6 +86,10 @@ def carregar_da_nuvem(usuario, senha_mestra):
         if res.status_code == 200:
             resposta = res.json()
             blob = resposta.get("blob", "")
+            if blob:
+                missing_padding = len(blob) % 4
+                if missing_padding:
+                    blob += '=' * (4 - missing_padding)
             chave_temp = derivar_chave(senha_mestra)
             
             if blob:
@@ -93,7 +97,8 @@ def carregar_da_nuvem(usuario, senha_mestra):
                     json_decifrado = chave_temp.decrypt(blob.encode()).decode()
                     dados = json.loads(json_decifrado)
                     return True, chave_temp, dados
-                except:
+                except Exception as e:
+                    print(f"Erro ao decifrar: {e}")
                     return False, None, [] 
             else:
                 return True, chave_temp, [] 
