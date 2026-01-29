@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import 'react-native-get-random-values'; 
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, Alert, SafeAreaView, StatusBar, ActivityIndicator, Modal } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, Alert, SafeAreaView, StatusBar, ActivityIndicator, Modal, Platform } from 'react-native';
 import axios from 'axios';
 import CryptoJS from 'crypto-js';
 import * as Clipboard from 'expo-clipboard';
@@ -24,7 +24,6 @@ export default function App() {
   const [formSenha, setFormSenha] = useState('');
 
   // --- FUNÇÕES ÚTEIS ---
-  
   const gerarSenhaAleatoria = () => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+";
     let password = "";
@@ -187,7 +186,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
       
       <View style={styles.header}>
         <TouchableOpacity style={styles.btnSmall} onPress={() => {setTela('login'); setDados([]);}}>
@@ -269,7 +268,12 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#0f172a',
+    // --- LAYOUT ANDROID ---
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 
+  },
   loginContainer: { flex: 1, backgroundColor: '#0f172a', justifyContent: 'center' },
   card: { backgroundColor: '#1e293b', margin: 20, padding: 25, borderRadius: 15 },
   logo: { fontSize: 50, textAlign: 'center', marginBottom: 10 },

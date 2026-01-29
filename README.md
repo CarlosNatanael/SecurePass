@@ -1,4 +1,4 @@
-# 🔐 SecurePass Cloud
+# SecurePass Cloud
 
 > Um gerenciador de senhas multiplataforma (Desktop & Mobile) com arquitetura "Zero-Knowledge", sincronização em nuvem e criptografia de ponta a ponta.
 
@@ -39,72 +39,11 @@ O **SecurePass Cloud** é uma solução completa para gerenciamento de credencia
 
 ---
 
-## Como Executar o Projeto
-
 ### Pré-requisitos
 > [!NOTE]
 >* `Python 3.10+` instalado.
 >* `Node.js` instalado.
 >* `Expo Go` instalado no celular (para testar o mobile).
-
-### 1️⃣ Configurando o Backend
-
-O backend é o coração da sincronização.
-
-```bash
-# Entre na pasta do backend
-cd backend
-
-# Crie um ambiente virtual (recomendado)
-python -m venv venv
-# Ative o venv (Windows: venv\Scripts\activate | Linux/Mac: source venv/bin/activate)
-
-# Instale as dependências
-pip install fastapi uvicorn pydantic a2wsgi
-
-# Inicie o servidor
-uvicorn main:app --reload --host 0.0.0.0
-
-```
-
-> O servidor rodará em `http://localhost:8000` (ou no seu IP local).
-
-### 2️⃣ Executando o Cliente Desktop
-
-```bash
-# Entre na pasta do frontend desktop
-cd frontend_desktop
-
-# Instale as dependências
-pip install requests cryptography
-
-# Configure o IP do servidor no código se necessário
-# Execute o app
-python app_tkinter_cloud.py
-
-```
-
-### 3️⃣ Executando o App Mobile
-
-```bash
-# Entre na pasta mobile
-cd securepass-mobile
-
-# Instale as dependências
-npm install
-
-# ⚠️ CONFIGURAÇÃO IMPORTANTE:
-# Crie um arquivo chamado 'config.js' na raiz da pasta mobile
-# Conteúdo do config.js:
-# export const API_URL = "http://SEU_IP_DO_PC:8000";
-
-# Inicie o Expo
-npx expo start
-```
-
-> Escaneie o QR Code com o app **Expo Go** no seu celular.
-
----
 
 ##  Arquitetura de Segurança
 
